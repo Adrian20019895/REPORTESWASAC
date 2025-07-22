@@ -1,0 +1,562 @@
+using System;
+using System.Data;
+using System.Data.SqlClient;
+using System.Globalization;
+using System.IO;
+using iTextSharp.text;
+using iTextSharp.text.pdf;
+using System.Web.UI.HtmlControls;
+using System.Web.UI;
+using System.Web;
+using System.Web.UI.WebControls;
+
+public partial class DetalleSaldos : System.Web.UI.Page
+{
+    // Cadena de conexión a la base de datos
+    private string conexion = "Server=localhost\\SQLEXPRESS;Database=SIAC;User ID=wasac;Password=WASAC;";
+    private string programaSeleccionado = "";
+    
+    protected void Page_Load(object sender, EventArgs e)
+    {
+        if (!IsPostBack)
+        {
+            // Mostrar indicador de carga
+            ScriptManager.RegisterStartupScript(this, GetType(), "showLoading", 
+                "document.getElementById('loadingMessage').style.display = 'block';", true);
+            
+            // Recupera el programa de la QueryString
+            if (Request.QueryString["Programa"] != null)
+            {
+                programaSeleccionado = Request.QueryString["Programa"].ToString();
+                lblPrograma.Text = programaSeleccionado;
+                
+                // Carga los datos del programa y los beneficiarios
+                CargarResumenPrograma();
+                CargarDetalleBeneficiarios();
+                
+                // Ocultar indicador de carga cuando todo esté listo
+                ScriptManager.RegisterStartupScript(this, GetType(), "hideLoading", 
+                    "document.getElementById('loadingMessage').style.display = 'none';", true);
+            }
+            else
+            {
+                // Redirige a la página principal si no hay programa seleccionado
+                Response.Redirect("VerDatos.aspx");
+            }
+        }
+    }
+
+    // Carga el resumen del programa (totales)
+    private void CargarResumenPrograma()
+    {
+        using (SqlConnection con = new SqlConnection(conexion))
+        {
+            string consulta = @"SELECT 
+                                SUM(MontoAsignado) AS TotalAsignado, 
+                                SUM(AmortizacionPag) AS MontoPagadoCapital,
+                                SUM(InteresRealPag + InteresFijoPag + MoratorioPag - DescuentoPag) AS MontoPagadoIntereses,
+                                SUM(GastosAdmonPag + SeguroPag + OtroSeguroPag - SubsidioPag) AS OtrosGastos,
+                                SUM(TotalPag) AS TotalPagado,
+                                SUM(MontoAsignado) - SUM(AmortizacionPag) AS SaldoPendienteCapital,
+                                0 AS SaldoPendiente, -- Lo vamos a calcular por separado
+                                COUNT(DISTINCT fiBeneficiario) AS TotalBeneficiarios
+                            FROM [SIAC].[dbo].[SIVvwResumenBeneficiario] 
+                            WHERE Programa = @Programa AND Estatus = 'Aceptado por Cobranza'";
+
+            SqlCommand cmd = new SqlCommand(consulta, con);
+            cmd.Parameters.AddWithValue("@Programa", programaSeleccionado);
+            con.Open();
+            SqlDataReader reader = cmd.ExecuteReader();
+
+            if (reader.Read())
+            {
+                decimal totalAsignado = reader["TotalAsignado"] != DBNull.Value ? Convert.ToDecimal(reader["TotalAsignado"]) : 0;
+                decimal montoPagadoCapital = reader["MontoPagadoCapital"] != DBNull.Value ? Convert.ToDecimal(reader["MontoPagadoCapital"]) : 0;
+                decimal montoPagadoIntereses = reader["MontoPagadoIntereses"] != DBNull.Value ? Convert.ToDecimal(reader["MontoPagadoIntereses"]) : 0;
+                decimal otrosGastos = reader["OtrosGastos"] != DBNull.Value ? Convert.ToDecimal(reader["OtrosGastos"]) : 0;
+                decimal totalPagado = reader["TotalPagado"] != DBNull.Value ? Convert.ToDecimal(reader["TotalPagado"]) : 0;
+                decimal saldoPendienteCapital = reader["SaldoPendienteCapital"] != DBNull.Value ? Convert.ToDecimal(reader["SaldoPendienteCapital"]) : 0;
+                decimal saldoPendiente = reader["SaldoPendiente"] != DBNull.Value ? Convert.ToDecimal(reader["SaldoPendiente"]) : 0;
+                int totalBeneficiarios = reader["TotalBeneficiarios"] != DBNull.Value ? Convert.ToInt32(reader["TotalBeneficiarios"]) : 0;
+
+                // Asigna los valores a los labels
+                lblTotalAsignado.Text = "$" + totalAsignado.ToString("N2");
+                lblMontoPagadoCapital.Text = "$" + montoPagadoCapital.ToString("N2");
+                lblMontoPagadoIntereses.Text = "$" + montoPagadoIntereses.ToString("N2");
+                lblOtrosGastos.Text = "$" + otrosGastos.ToString("N2");
+                lblTotalPagado.Text = "$" + totalPagado.ToString("N2");
+                lblSaldoPendienteCapital.Text = "$" + saldoPendienteCapital.ToString("N2");
+                // Calcular el total de saldo para liquidar sumando el saldo individual de cada beneficiario
+                decimal totalSaldoParaLiquidar = CalcularTotalSaldoParaLiquidar();
+                lblSaldoPendiente.Text = "$" + totalSaldoParaLiquidar.ToString("N2");
+                lblTotalBeneficiarios.Text = totalBeneficiarios.ToString();
+            }
+            
+            reader.Close();
+        }
+    }
+
+    // Carga el detalle de beneficiarios usando datos precalculados
+    private void CargarDetalleBeneficiarios()
+    {
+        using (SqlConnection con = new SqlConnection(conexion))
+        {
+            con.Open();
+
+            // Crear tabla temporal para almacenar saldos precalculados (solo SaldoPendienteInteresesMoratorios)
+            SqlCommand cmdTemp = new SqlCommand(@"
+                IF OBJECT_ID('tempdb..#TempSaldosPrograma') IS NOT NULL DROP TABLE #TempSaldosPrograma;
+                CREATE TABLE #TempSaldosPrograma (
+                    IdBeneficiario INT,
+                    Beneficiario NVARCHAR(255),
+                    MontoAsignado DECIMAL(18,2),
+                    MontoPagadoCapital DECIMAL(18,2),
+                    MontoPagadoIntereses DECIMAL(18,2),
+                    OtrosGastos DECIMAL(18,2),
+                    TotalPagado DECIMAL(18,2),
+                    SaldoPendienteCapital DECIMAL(18,2),
+                    SaldoPendienteIntereses DECIMAL(18,2),
+                    SaldoPendienteInteresesMoratorios DECIMAL(18,2),
+                    IdSubprograma INT,
+                    FechaUltimoPago VARCHAR(10),
+                    SaldoParaLiquidar DECIMAL(18,2),
+                    FecContratacion VARCHAR(10)
+                )", con);
+            cmdTemp.ExecuteNonQuery();
+
+            // Insertar datos básicos usando la vista SIVvwResumenBeneficiario (agrega FecContratacion y SaldoPendienteInteresesMoratorios)
+            string consultaBase = @"
+                INSERT INTO #TempSaldosPrograma (IdBeneficiario, Beneficiario, MontoAsignado, MontoPagadoCapital, 
+                                                MontoPagadoIntereses, OtrosGastos, TotalPagado, SaldoPendienteCapital, SaldoPendienteIntereses, SaldoPendienteInteresesMoratorios, IdSubprograma, FechaUltimoPago, SaldoParaLiquidar, FecContratacion)
+                SELECT 
+                    r.fiBeneficiario,
+                    (r.Nombre + ' ' + r.Apaterno + ' ' + r.Amaterno),
+                    r.MontoAsignado,
+                    r.AmortizacionPag,
+                    (r.InteresRealPag + r.InteresFijoPag + r.MoratorioPag - r.DescuentoPag),
+                    (r.GastosAdmonPag + r.SeguroPag + r.OtroSeguroPag - r.SubsidioPag),
+                    r.TotalPag,
+                    (r.MontoAsignado - r.AmortizacionPag),
+                    (ISNULL(r.fiLiquidacionOrd, 0) - ISNULL(r.fiInteresMoratorio, 0) - (r.MontoAsignado - r.AmortizacionPag)),
+                    ISNULL(r.fiInteresMoratorio, 0),
+                    r.fiSubprograma,
+                    (SELECT ISNULL(CONVERT(varchar, MAX(fecAlta), 103), 'N/A') 
+                     FROM [SIAC].[dbo].[SIVaSolicitudCaja] 
+                     WHERE fiBeneficiario = r.fiBeneficiario AND fiSubprograma = r.fiSubprograma AND fiTipoPago <> 3) AS FechaUltimoPago,
+                    ISNULL(r.fiLiquidacionOrd, 0),
+                    CONVERT(varchar, r.FecContratacion, 103)
+                FROM [SIAC].[dbo].[SIVvwResumenBeneficiario] r
+                WHERE r.Programa = @Programa AND r.Estatus = 'Aceptado por Cobranza'";
+
+            if (!string.IsNullOrEmpty(txtBuscar.Text))
+            {
+                consultaBase += " AND (r.Nombre LIKE @Buscar OR r.Apaterno LIKE @Buscar OR r.Amaterno LIKE @Buscar)";
+            }
+
+            SqlCommand cmdBase = new SqlCommand(consultaBase, con);
+            cmdBase.Parameters.AddWithValue("@Programa", programaSeleccionado);
+
+            if (!string.IsNullOrEmpty(txtBuscar.Text))
+            {
+                cmdBase.Parameters.AddWithValue("@Buscar", "%" + txtBuscar.Text + "%");
+            }
+
+            cmdBase.ExecuteNonQuery();
+
+            // Obtener los datos básicos que ya incluyen el saldo para liquidar y FecContratacion
+            string consultaTemp = @"
+                SELECT IdBeneficiario, Beneficiario, MontoAsignado, MontoPagadoCapital, 
+                       MontoPagadoIntereses, OtrosGastos, TotalPagado, SaldoPendienteCapital, 
+                       SaldoPendienteIntereses, SaldoPendienteInteresesMoratorios, IdSubprograma, FechaUltimoPago, SaldoParaLiquidar, FecContratacion
+                FROM #TempSaldosPrograma
+                ORDER BY Beneficiario";
+
+            DataTable dt = new DataTable();
+            using (SqlDataAdapter da = new SqlDataAdapter(consultaTemp, con))
+            {
+                da.Fill(dt);
+            }
+
+            // Limpiar tabla temporal
+            SqlCommand cmdDrop = new SqlCommand("DROP TABLE #TempSaldosPrograma", con);
+            cmdDrop.ExecuteNonQuery();
+
+            GridViewDetalle.DataSource = dt;
+            GridViewDetalle.DataBind();
+        }
+    }
+
+    // Formato de celdas en GridView
+    protected void GridViewDetalle_RowDataBound(object sender, GridViewRowEventArgs e)
+    {
+        if (e.Row.RowType == DataControlRowType.DataRow)
+        {
+            // Formatea las columnas de moneda (índices 2-10)
+            for (int i = 2; i <= 10; i++)
+            {
+                if (i < e.Row.Cells.Count)
+                {
+                    decimal valor;
+                    if (decimal.TryParse(e.Row.Cells[i].Text, out valor))
+                    {
+                        e.Row.Cells[i].Text = "$" + valor.ToString("N2");
+                    }
+                }
+            }
+
+            // === SECCIÓN DE MONTOS PAGADOS (FONDO VERDE CLARO) ===
+            // Índice 2: Monto Asignado - Color neutro y negrita
+            if (e.Row.Cells.Count > 2)
+            {
+                e.Row.Cells[2].BackColor = System.Drawing.Color.FromArgb(245, 245, 245); // Gris muy claro
+                e.Row.Cells[2].ForeColor = System.Drawing.Color.FromArgb(33, 37, 41); // Gris oscuro
+                e.Row.Cells[2].Font.Bold = true;
+            }
+            // Índice 3: Monto Pagado a Capital - Verde claro
+            if (e.Row.Cells.Count > 3)
+            {
+                e.Row.Cells[3].BackColor = System.Drawing.Color.FromArgb(200, 230, 201); // Verde claro
+                e.Row.Cells[3].ForeColor = System.Drawing.Color.FromArgb(27, 94, 32); // Verde oscuro
+            }
+            // Índice 4: Monto Pagado a Intereses - Verde claro
+            if (e.Row.Cells.Count > 4)
+            {
+                e.Row.Cells[4].BackColor = System.Drawing.Color.FromArgb(200, 230, 201); // Verde claro
+                e.Row.Cells[4].ForeColor = System.Drawing.Color.FromArgb(27, 94, 32); // Verde oscuro
+            }
+            // Índice 5: Otros Gastos - Verde claro
+            if (e.Row.Cells.Count > 5)
+            {
+                e.Row.Cells[5].BackColor = System.Drawing.Color.FromArgb(200, 230, 201); // Verde claro
+                e.Row.Cells[5].ForeColor = System.Drawing.Color.FromArgb(27, 94, 32); // Verde oscuro
+            }
+            // Índice 6: Total Pagado - Verde más intenso y negrita
+            if (e.Row.Cells.Count > 6)
+            {
+                e.Row.Cells[6].BackColor = System.Drawing.Color.FromArgb(165, 214, 167); // Verde medio
+                e.Row.Cells[6].ForeColor = System.Drawing.Color.FromArgb(27, 94, 32); // Verde oscuro
+                e.Row.Cells[6].Font.Bold = true;
+            }
+            // === SECCIÓN DE SALDOS PENDIENTES (COLOR ROJO UNIFICADO) ===
+            // Índice 7: Saldo Pendiente a Capital
+            if (e.Row.Cells.Count > 7)
+            {
+                e.Row.Cells[7].BackColor = System.Drawing.Color.FromArgb(255, 205, 210); // Rojo claro
+                e.Row.Cells[7].ForeColor = System.Drawing.Color.FromArgb(183, 28, 28); // Rojo oscuro
+            }
+            // Índice 8: Total Saldo Pendiente - Rojo claro y negrita
+            if (e.Row.Cells.Count > 8)
+            {
+                e.Row.Cells[8].BackColor = System.Drawing.Color.FromArgb(255, 205, 210); // Rojo claro
+                e.Row.Cells[8].ForeColor = System.Drawing.Color.FromArgb(183, 28, 28); // Rojo oscuro
+                e.Row.Cells[8].Font.Bold = false;
+            }
+            // Índice 9: Saldo pendiente intereses moratorios (sin negrita)
+            if (e.Row.Cells.Count > 9)
+            {
+                e.Row.Cells[9].BackColor = System.Drawing.Color.FromArgb(255, 205, 210); // Rojo claro
+                e.Row.Cells[9].ForeColor = System.Drawing.Color.FromArgb(183, 28, 28); // Rojo oscuro
+                e.Row.Cells[9].Font.Bold = false;
+            }
+            // Índice 10: Saldo Para Liquidar - Rojo claro y negrita
+            if (e.Row.Cells.Count > 10)
+            {
+                e.Row.Cells[10].BackColor = System.Drawing.Color.FromArgb(255, 205, 210); // Rojo claro
+                e.Row.Cells[10].ForeColor = System.Drawing.Color.FromArgb(183, 28, 28); // Rojo oscuro
+                e.Row.Cells[10].Font.Bold = true;
+            }
+            // Índice 11: Fecha de Contratación - Azul claro
+            if (e.Row.Cells.Count > 11)
+            {
+                e.Row.Cells[11].BackColor = System.Drawing.Color.FromArgb(227, 242, 253); // Azul muy claro
+                e.Row.Cells[11].ForeColor = System.Drawing.Color.FromArgb(13, 71, 161); // Azul oscuro
+                e.Row.Cells[11].Font.Bold = true;
+            }
+            // Índice 12: Fecha Último Pago - Azul claro
+            if (e.Row.Cells.Count > 12)
+            {
+                e.Row.Cells[12].BackColor = System.Drawing.Color.FromArgb(227, 242, 253); // Azul muy claro
+                e.Row.Cells[12].ForeColor = System.Drawing.Color.FromArgb(13, 71, 161); // Azul oscuro
+                e.Row.Cells[12].Font.Bold = true;
+            }
+        }
+        
+        // === ESTILO PARA ENCABEZADOS ===
+        else if (e.Row.RowType == DataControlRowType.Header)
+        {
+            for (int i = 0; i < e.Row.Cells.Count; i++)
+            {
+                if (i >= 3 && i <= 6) // Columnas de "MONTO PAGADO"
+                {
+                    e.Row.Cells[i].BackColor = System.Drawing.Color.FromArgb(76, 175, 80); // Verde
+                    e.Row.Cells[i].ForeColor = System.Drawing.Color.White;
+                    e.Row.Cells[i].Font.Bold = true;
+                }
+                else if (i >= 7 && i <= 10) // Las cuatro columnas de saldos
+                {
+                    e.Row.Cells[i].BackColor = System.Drawing.Color.FromArgb(244, 67, 54); // Rojo fuerte
+                    e.Row.Cells[i].ForeColor = System.Drawing.Color.White;
+                    e.Row.Cells[i].Font.Bold = true;
+                }
+                else if (i == 2) // Monto Asignado
+                {
+                    e.Row.Cells[i].BackColor = System.Drawing.Color.FromArgb(96, 125, 139); // Gris azulado
+                    e.Row.Cells[i].ForeColor = System.Drawing.Color.White;
+                    e.Row.Cells[i].Font.Bold = true;
+                }
+                else if (i == 11) // Fecha de Contratación
+                {
+                    e.Row.Cells[i].BackColor = System.Drawing.Color.FromArgb(63, 81, 181); // Azul índigo
+                    e.Row.Cells[i].ForeColor = System.Drawing.Color.White;
+                    e.Row.Cells[i].Font.Bold = true;
+                }
+                else if (i == 12) // Fecha Último Pago
+                {
+                    e.Row.Cells[i].BackColor = System.Drawing.Color.FromArgb(63, 81, 181); // Azul índigo
+                    e.Row.Cells[i].ForeColor = System.Drawing.Color.White;
+                    e.Row.Cells[i].Font.Bold = true;
+                }
+                else
+                {
+                    e.Row.Cells[i].BackColor = System.Drawing.Color.FromArgb(216, 38, 40); // Rojo original
+                    e.Row.Cells[i].ForeColor = System.Drawing.Color.White;
+                    e.Row.Cells[i].Font.Bold = true;
+                }
+            }
+        }
+    }
+
+    // Comando para ver el detalle de pagos de un beneficiario
+    protected void GridViewDetalle_RowCommand(object sender, GridViewCommandEventArgs e)
+    {
+        if (e.CommandName == "VerDetalleBeneficiario")
+        {
+            // Obtener el índice de la fila seleccionada
+            int index = Convert.ToInt32(e.CommandArgument);
+            
+            // Obtener el valor del IdBeneficiario y IdSubprograma de la fila
+            string idBeneficiario = GridViewDetalle.DataKeys[index]["IdBeneficiario"].ToString();
+            string idSubprograma = GridViewDetalle.DataKeys[index]["IdSubprograma"].ToString();
+            
+            string programa = Request.QueryString["Programa"];
+            Response.Redirect(string.Format("DetallePagosBeneficiario.aspx?IdBeneficiario={0}&IdSubprograma={1}&Programa={2}", idBeneficiario, idSubprograma, programa));
+        }
+    }
+
+    // Botón para volver a la página anterior
+    protected void btnVolver_Click(object sender, EventArgs e)
+    {
+        Response.Redirect("VerDatos.aspx");
+    }
+    
+    // Botón para buscar beneficiarios
+    protected void btnBuscar_Click(object sender, EventArgs e)
+    {
+        // Mostrar indicador de carga
+        ScriptManager.RegisterStartupScript(this, GetType(), "showLoadingSearch", 
+            "document.getElementById('loadingMessage').style.display = 'block';", true);
+        
+        CargarDetalleBeneficiarios();
+        
+        // Ocultar indicador de carga cuando termina
+        ScriptManager.RegisterStartupScript(this, GetType(), "hideLoadingSearch", 
+            "document.getElementById('loadingMessage').style.display = 'none';", true);
+    }
+
+    // Exporta los datos a PDF con formato mejorado usando la clase DetalleSaldosPDFExporter
+    protected void btnExportarPDF_Click(object sender, EventArgs e)
+    {
+        try
+        {
+            // Asegura que el GridView tenga los datos más recientes
+            GridViewDetalle.AllowPaging = false;
+            CargarDetalleBeneficiarios();
+            string programaSeleccionado = Request.QueryString["Programa"] != null ? Request.QueryString["Programa"].ToString() : "Todos";
+
+            // Llama al nuevo método para generar el PDF profesional
+            DetalleSaldosPDFExporter.GenerarPDFCompleto(
+                GridViewDetalle,
+                lblPrograma,
+                lblTotalAsignado,
+                lblMontoPagadoCapital,
+                lblMontoPagadoIntereses,
+                lblTotalPagado,
+                lblSaldoPendienteCapital,
+                lblOtrosGastos,
+                lblSaldoPendiente,
+                lblTotalBeneficiarios,
+                programaSeleccionado,
+                Response,
+                Server
+            );
+        }
+        catch (Exception ex)
+        {
+            // Muestra un mensaje de error amigable
+            string script = $"alert('Ocurrió un error al generar el PDF: {ex.Message.Replace("'", "\\'")}');";
+            ScriptManager.RegisterStartupScript(this, GetType(), "ErrorPDF", script, true);
+        }
+    }
+
+    // Exporta los datos a Excel
+    protected void btnExportarExcel_Click(object sender, EventArgs e)
+    {
+        GridViewDetalle.AllowPaging = false;
+        CargarDetalleBeneficiarios();
+
+        // Oculta la columna de acciones antes de exportar (ahora es la columna 11)
+        GridViewDetalle.Columns[13].Visible = false;
+
+        Response.Clear();
+        Response.Buffer = true;
+        Response.AddHeader("content-disposition", "attachment;filename=DetalleSaldos_" + programaSeleccionado.Replace(" ", "_") + ".xls");
+        Response.Charset = "";
+        Response.ContentType = "application/vnd.ms-excel";
+
+        using (StringWriter sw = new StringWriter())
+        {
+            using (HtmlTextWriter hw = new HtmlTextWriter(sw))
+            {
+                // Escribir encabezado HTML para Excel
+                hw.Write("<html><head><meta charset='UTF-8'></head><body>");
+                hw.Write("<table border='1' cellpadding='3' cellspacing='0'>");
+                
+                // Escribir encabezados
+                hw.Write("<tr>");
+                for (int i = 0; i < GridViewDetalle.Columns.Count; i++)
+                {
+                    if (GridViewDetalle.Columns[i].Visible)
+                    {
+                        string headerText = GridViewDetalle.Columns[i].HeaderText;
+                        // Cambiar el nombre solo para el Excel si es la columna de intereses
+                        if (headerText == "Saldo pendiente Interes Real" || headerText == "Saldo Pendiente a Intereses")
+                            headerText = "Saldo pendiente Interes Real";
+                        if (headerText == "Saldo pendiente intereses moratorios")
+                            headerText = "Saldo pendiente intereses moratorios";
+                        hw.Write("<th style='background-color: #D82628; color: white; font-weight: bold;'>");
+                        hw.Write(headerText);
+                        hw.Write("</th>");
+                    }
+                }
+                hw.Write("</tr>");
+                
+                // Escribir datos - verificar que hay filas
+                if (GridViewDetalle.Rows.Count > 0)
+                {
+                    foreach (GridViewRow row in GridViewDetalle.Rows)
+                    {
+                        if (row.RowType == DataControlRowType.DataRow)
+                        {
+                            hw.Write("<tr>");
+                            for (int i = 0; i < row.Cells.Count; i++)
+                            {
+                                if (i < GridViewDetalle.Columns.Count && GridViewDetalle.Columns[i].Visible)
+                                {
+                                    hw.Write("<td>");
+                                    // Limpiar el texto para Excel
+                                    string cellText = row.Cells[i].Text;
+                                    if (cellText == "&nbsp;")
+                                        cellText = "";
+                                    hw.Write(cellText);
+                                    hw.Write("</td>");
+                                }
+                            }
+                            hw.Write("</tr>");
+                        }
+                    }
+                }
+                else
+                {
+                    // Si no hay datos, mostrar mensaje
+                    hw.Write("<tr><td colspan='" + GridViewDetalle.Columns.Count + "'>No hay datos para mostrar</td></tr>");
+                }
+                
+                hw.Write("</table></body></html>");
+                
+                Response.Output.Write(sw.ToString());
+                Response.Flush();
+                Response.End();
+            }
+        }
+
+        // Vuelve a mostrar la columna después de exportar
+        GridViewDetalle.Columns[13].Visible = true;
+    }
+
+    // Requerido por ASP.NET para exportar controles de servidor
+    public override void VerifyRenderingInServerForm(Control control)
+    {
+        // Método vacío para evitar errores de renderizado al exportar
+    }
+
+    // Calcula el saldo para liquidar para un beneficiario específico
+    private decimal CalcularSaldoParaLiquidar(int idBeneficiario, int idSubprograma)
+    {
+        decimal saldoLiquidar = 0;
+        
+        try
+        {
+            using (SqlConnection con = new SqlConnection(conexion))
+            {
+                string consulta = @"
+                    SELECT ISNULL(fiLiquidacionOrd, 0) AS SaldoLiquidar
+                    FROM [SIAC].[dbo].[SIVvwResumenBeneficiario]
+                    WHERE fiBeneficiario = @IdBeneficiario AND fiSubprograma = @IdSubprograma AND Estatus = 'Aceptado por Cobranza'";
+                
+                SqlCommand cmd = new SqlCommand(consulta, con);
+                cmd.Parameters.AddWithValue("@IdBeneficiario", idBeneficiario);
+                cmd.Parameters.AddWithValue("@IdSubprograma", idSubprograma);
+                
+                con.Open();
+                object result = cmd.ExecuteScalar();
+                if (result != null && result != DBNull.Value)
+                {
+                    saldoLiquidar = Convert.ToDecimal(result);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log error pero continúa con el valor predeterminado
+            System.Diagnostics.Debug.WriteLine(string.Format("Error al calcular saldo para liquidar: {0}", ex.Message));
+        }
+        
+        return saldoLiquidar;
+    }
+
+    // Calcula el total de saldo para liquidar de todos los beneficiarios del programa actual
+    private decimal CalcularTotalSaldoParaLiquidar()
+    {
+        decimal totalSaldoLiquidar = 0;
+        
+        try
+        {
+            using (SqlConnection con = new SqlConnection(conexion))
+            {
+                con.Open();
+                
+                // Consulta directa a la vista SIVvwResumenBeneficiario
+                string consultaTotal = @"
+                    SELECT ISNULL(SUM(r.fiLiquidacionOrd), 0) AS TotalSaldoLiquidar
+                    FROM [SIAC].[dbo].[SIVvwResumenBeneficiario] r
+                    WHERE r.Programa = @Programa AND r.Estatus = 'Aceptado por Cobranza'";
+                
+                SqlCommand cmd = new SqlCommand(consultaTotal, con);
+                cmd.Parameters.AddWithValue("@Programa", programaSeleccionado);
+                
+                object result = cmd.ExecuteScalar();
+                if (result != null && result != DBNull.Value)
+                {
+                    totalSaldoLiquidar = Convert.ToDecimal(result);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log error pero continúa
+            System.Diagnostics.Debug.WriteLine(string.Format("Error al calcular total de saldo para liquidar: {0}", ex.Message));
+        }
+        
+        return totalSaldoLiquidar;
+    }
+}
