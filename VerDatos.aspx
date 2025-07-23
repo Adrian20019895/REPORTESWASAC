@@ -91,8 +91,8 @@
             margin-bottom: 8px;
             margin-top: 8px;
             letter-spacing: 0.5px;
-            width: 48px;
-            height: 48px;
+            width: 64px;
+            height: 64px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -100,7 +100,7 @@
             background-image: url('../img/pdf.png');
             background-repeat: no-repeat;
             background-position: center;
-            background-size: 24px 24px;
+            background-size: 32px 32px;
             position: relative;
             overflow: hidden;
         }
@@ -130,8 +130,8 @@
             margin-bottom: 8px;
             margin-top: 8px;
             letter-spacing: 0.5px;
-            width: 48px;
-            height: 48px;
+            width: 64px;
+            height: 64px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -139,7 +139,7 @@
             background-image: url('../img/excel.png');
             background-repeat: no-repeat;
             background-position: center;
-            background-size: 24px 24px;
+            background-size: 32px 32px;
             position: relative;
             overflow: hidden;
         }
@@ -169,8 +169,8 @@
             margin-bottom: 8px;
             margin-top: 8px;
             letter-spacing: 0.5px;
-            width: 48px;
-            height: 48px;
+            width: 64px;
+            height: 64px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -178,7 +178,7 @@
             background-image: url('../img/beneficiarios.png');
             background-repeat: no-repeat;
             background-position: center;
-            background-size: 24px 24px;
+            background-size: 32px 32px;
             position: relative;
             overflow: hidden;
         }
@@ -208,8 +208,8 @@
             margin-bottom: 8px;
             margin-top: 8px;
             letter-spacing: 0.5px;
-            width: 48px;
-            height: 48px;
+            width: 64px;
+            height: 64px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -217,7 +217,7 @@
             background-image: url('../img/cobranza.png');
             background-repeat: no-repeat;
             background-position: center;
-            background-size: 24px 24px;
+            background-size: 32px 32px;
             position: relative;
             overflow: hidden;
         }
@@ -247,8 +247,8 @@
             margin-bottom: 8px;
             margin-top: 8px;
             letter-spacing: 0.5px;
-            width: 48px;
-            height: 48px;
+            width: 64px;
+            height: 64px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -256,7 +256,7 @@
             background-image: url('../img/notificaciones.png');
             background-repeat: no-repeat;
             background-position: center;
-            background-size: 24px 24px;
+            background-size: 32px 32px;
             position: relative;
             overflow: hidden;
         }
