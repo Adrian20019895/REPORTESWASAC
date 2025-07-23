@@ -81,63 +81,195 @@
             background: linear-gradient(90deg, #ff5858 0%, #D82628 100%);
             color: #fff;
             border: none;
-            border-radius: 25px;
-            padding: 12px 32px;
-            font-size: 1.1em;
+            border-radius: 50%;
+            padding: 12px;
+            font-size: 1em;
             font-weight: bold;
             cursor: pointer;
             box-shadow: 0 2px 8px rgba(255, 88, 88, 0.15);
-            transition: background 0.3s, transform 0.2s;
-            margin-bottom: 24px;
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
             margin-top: 8px;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            background-image: url('../img/pdf.png');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 24px 24px;
+            position: relative;
+            overflow: hidden;
         }
         .btn-pdf:hover {
             background: linear-gradient(90deg, #D82628 100%, #ff5858 0%);
-            transform: translateY(-2px) scale(1.04);
+            transform: translateY(-2px) scale(1.05);
             box-shadow: 0 4px 16px rgba(255, 88, 88, 0.25);
+            border-radius: 25px;
+            width: auto;
+            min-width: 160px;
+            padding: 12px 20px 12px 45px;
+            background-position: 15px center;
+            background-size: 20px 20px;
         }
         /* Boton para Excel */
         .btn-excel {
             background: linear-gradient(90deg, #43a047 0%, #388e3c 100%);
             color: #fff;
             border: none;
-            border-radius: 25px;
-            padding: 12px 32px;
-            font-size: 1.1em;
+            border-radius: 50%;
+            padding: 12px;
+            font-size: 1em;
             font-weight: bold;
             cursor: pointer;
             box-shadow: 0 2px 8px rgba(67, 160, 71, 0.15);
-            transition: background 0.3s, transform 0.2s;
-            margin-bottom: 24px;
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
             margin-top: 8px;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            background-image: url('../img/excel.png');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 24px 24px;
+            position: relative;
+            overflow: hidden;
         }
         .btn-excel:hover {
             background: linear-gradient(90deg, #388e3c 0%, #43a047 100%);
-            transform: translateY(-2px) scale(1.04);
+            transform: translateY(-2px) scale(1.05);
             box-shadow: 0 4px 16px rgba(67, 160, 71, 0.25);
+            border-radius: 25px;
+            width: auto;
+            min-width: 170px;
+            padding: 12px 20px 12px 45px;
+            background-position: 15px center;
+            background-size: 20px 20px;
         }
         /* Botón para Beneficiarios No Aceptados */
         .btn-beneficiarios {
             background: linear-gradient(90deg, #FF9800 0%, #F57C00 100%);
             color: #fff;
             border: none;
-            border-radius: 25px;
-            padding: 12px 32px;
-            font-size: 1.1em;
+            border-radius: 50%;
+            padding: 12px;
+            font-size: 1em;
             font-weight: bold;
             cursor: pointer;
             box-shadow: 0 2px 8px rgba(255, 152, 0, 0.15);
-            transition: background 0.3s, transform 0.2s;
-            margin-bottom: 24px;
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
             margin-top: 8px;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            background-image: url('../img/beneficiarios.png');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 24px 24px;
+            position: relative;
+            overflow: hidden;
         }
         .btn-beneficiarios:hover {
             background: linear-gradient(90deg, #F57C00 0%, #FF9800 100%);
-            transform: translateY(-2px) scale(1.04);
+            transform: translateY(-2px) scale(1.05);
             box-shadow: 0 4px 16px rgba(255, 152, 0, 0.25);
+            border-radius: 25px;
+            width: auto;
+            min-width: 220px;
+            padding: 12px 20px 12px 45px;
+            background-position: 15px center;
+            background-size: 20px 20px;
+        }
+        /* Botón para Cobranza */
+        .btn-cobranza {
+            background: linear-gradient(90deg, #2E7D32 0%, #4CAF50 100%);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            padding: 12px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(46, 125, 50, 0.15);
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
+            margin-top: 8px;
+            letter-spacing: 0.5px;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            background-image: url('../img/cobranza.png');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 24px 24px;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-cobranza:hover {
+            background: linear-gradient(90deg, #4CAF50 0%, #2E7D32 100%);
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 4px 16px rgba(46, 125, 50, 0.25);
+            border-radius: 25px;
+            width: auto;
+            min-width: 160px;
+            padding: 12px 20px 12px 45px;
+            background-position: 15px center;
+            background-size: 20px 20px;
+        }
+        /* Botón para Notificaciones */
+        .btn-notificaciones {
+            background: linear-gradient(90deg, #3F51B5 0%, #303F9F 100%);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            padding: 12px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(63, 81, 181, 0.15);
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
+            margin-top: 8px;
+            letter-spacing: 0.5px;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            background-image: url('../img/notificaciones.png');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 24px 24px;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-notificaciones:hover {
+            background: linear-gradient(90deg, #303F9F 0%, #3F51B5 100%);
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 4px 16px rgba(63, 81, 181, 0.25);
+            border-radius: 25px;
+            width: auto;
+            min-width: 150px;
+            padding: 12px 20px 12px 45px;
+            background-position: 15px center;
+            background-size: 20px 20px;
         }
         /* Estilos para el DropDownList */
         .barra-seleccion {
@@ -330,17 +462,62 @@
         .resumen-item .valor.beneficiarios {
             color: #0277BD;
         }
+        
+        /* Botón estilo estático para botones que siempre muestran texto */
+        .btn-pdf-static {
+            background: linear-gradient(90deg, #ff5858 0%, #D82628 100%);
+            color: #fff;
+            border: none;
+            border-radius: 25px;
+            padding: 12px 32px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(255, 88, 88, 0.15);
+            transition: background 0.3s, transform 0.2s;
+            margin-bottom: 24px;
+            margin-top: 8px;
+            letter-spacing: 1px;
+        }
+        .btn-pdf-static:hover {
+            background: linear-gradient(90deg, #D82628 100%, #ff5858 0%);
+            transform: translateY(-2px) scale(1.04);
+            box-shadow: 0 4px 16px rgba(255, 88, 88, 0.25);
+        }
+        
+        /* Botón estático más pequeño para acciones en tabla */
+        .btn-pdf-table {
+            background: linear-gradient(90deg, #ff5858 0%, #D82628 100%);
+            color: #fff;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 0.9em;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(255, 88, 88, 0.15);
+            transition: background 0.3s, transform 0.2s;
+            letter-spacing: 0.5px;
+        }
+        .btn-pdf-table:hover {
+            background: linear-gradient(90deg, #D82628 100%, #ff5858 0%);
+            transform: translateY(-2px) scale(1.04);
+            box-shadow: 0 4px 16px rgba(255, 88, 88, 0.25);
+        }
     </style>
 </head>
 <body>
     <!-- Barra superior institucional con logo y botones de exportacion -->
     <form id="form2" runat="server">
+        <asp:ScriptManager ID="ScriptManager1" runat="server"></asp:ScriptManager>
         <div class="barra-institucional">
             <img src="/WASAC/img/logocodesvi.png" alt="Logo 1" class="logo-institucion" />
             <div class="barra-botones-exportar">
-                <asp:Button ID="btnBeneficiariosNoAceptados" runat="server" Text="⚠️ Beneficiarios No Aceptados" OnClick="btnBeneficiariosNoAceptados_Click" CssClass="btn-beneficiarios" />
-                <asp:Button ID="Button1" runat="server" Text="Exportar a PDF" OnClick="btnExportarPDF_Click" CssClass="btn-pdf" />
-                <asp:Button ID="Button2" runat="server" Text="Exportar a Excel" OnClick="btnExportarExcel_Click" CssClass="btn-excel" />
+                <asp:Button ID="btnCobranza" runat="server" Text="" OnClick="btnCobranza_Click" CssClass="btn-cobranza" ToolTip="Cobranza Diaria" />
+                <asp:Button ID="btnNotificaciones" runat="server" Text="" OnClick="btnNotificaciones_Click" CssClass="btn-notificaciones" ToolTip="Notificaciones" />
+                <asp:Button ID="btnBeneficiariosNoAceptados" runat="server" Text="" OnClick="btnBeneficiariosNoAceptados_Click" CssClass="btn-beneficiarios" ToolTip="Beneficiarios No Aceptados" />
+                <asp:Button ID="Button1" runat="server" Text="" OnClick="btnExportarPDF_Click" CssClass="btn-pdf" ToolTip="Exportar a PDF" />
+                <asp:Button ID="Button2" runat="server" Text="" OnClick="btnExportarExcel_Click" CssClass="btn-excel" ToolTip="Exportar a Excel" />
             </div>
         </div>
         <div class="container">
@@ -431,7 +608,8 @@
                 <div class="barra-superior">
                     <div class="izquierda">
                         <asp:DropDownList ID="ddlProgramas" runat="server" CssClass="barra-seleccion" />
-                        <asp:Button ID="Button6" runat="server" Text="Generar Reporte" CssClass="btn-pdf" OnClick="btnGenerarReporte_Click" />
+                        <asp:DropDownList ID="ddlMunicipios" runat="server" CssClass="barra-seleccion" AutoPostBack="true" OnSelectedIndexChanged="ddlMunicipios_SelectedIndexChanged" />
+                        <asp:Button ID="Button6" runat="server" Text="Generar Reporte" CssClass="btn-pdf-static" OnClick="btnGenerarReporte_Click" />
                     </div>
                 </div>
                 <br />
@@ -453,7 +631,7 @@
                                 <asp:Button ID="btnDetalleSaldos" runat="server" Text="Ver Detalle de Saldos" 
                                     CommandName="VerDetalleSaldos" 
                                     CommandArgument='<%# Eval("Programa") %>'
-                                    CssClass="btn-pdf" style="padding: 8px 16px; font-size: 0.9em;" />
+                                    CssClass="btn-pdf-table" />
                             </ItemTemplate>
                         </asp:TemplateField>
                     </Columns>
@@ -469,5 +647,37 @@
             <div><small>Esta operación puede tardar unos momentos</small></div>
         </div>
     </div>
+    
+    <script type="text/javascript">
+        // Textos para mostrar en hover
+        const buttonTexts = {
+            'btnCobranza': 'Cobranza Diaria',
+            'btnNotificaciones': 'Notificaciones',
+            'btnBeneficiariosNoAceptados': 'Beneficiarios No Aceptados',
+            'Button1': 'Exportar a PDF',
+            'Button2': 'Exportar a Excel'
+        };
+        
+        // Configurar eventos cuando se carga la página
+        window.addEventListener('load', function() {
+            Object.keys(buttonTexts).forEach(function(buttonId) {
+                const btn = document.getElementById(buttonId);
+                if (btn) {
+                    // Inicialmente sin texto (solo ícono)
+                    btn.value = '';
+                    
+                    // Al entrar el mouse - mostrar texto
+                    btn.addEventListener('mouseenter', function() {
+                        this.value = buttonTexts[buttonId];
+                    });
+                    
+                    // Al salir el mouse - ocultar texto
+                    btn.addEventListener('mouseleave', function() {
+                        this.value = '';
+                    });
+                }
+            });
+        });
+    </script>
 </body>
 </html>

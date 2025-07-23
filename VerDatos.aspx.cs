@@ -21,15 +21,16 @@ public partial class VerDatos : System.Web.UI.Page
         if (!IsPostBack)
         {
             ScriptManager.RegisterStartupScript(this, GetType(), "showLoading", "document.getElementById('loadingMessage').style.display = 'block';", true);
+            CargarMunicipios(); // Cargar municipios antes de mostrar datos
             MostrarDatos(); // Carga datos y totales
             ScriptManager.RegisterStartupScript(this, GetType(), "hideLoading", "document.getElementById('loadingMessage').style.display = 'none';", true);
         }
     }
 
     // Calcula y muestra los totales generales o de un programa específico
-    private void MostrarTotalesGenerales(string programa = null)
+    private void MostrarTotalesGenerales(string programa = null, string municipio = null)
     {
-        ActualizarTituloResumen(programa);
+        ActualizarTituloResumen(programa, municipio);
         // Consulta SQL para totales generales
         string conexion = "Server=localhost\\SQLEXPRESS;Database=SIAC;User ID=wasac;Password=WASAC;";
         using (SqlConnection con = new SqlConnection(conexion))
@@ -49,12 +50,22 @@ public partial class VerDatos : System.Web.UI.Page
                 FROM 
                     [SIAC].[dbo].[SIVvwResumenBeneficiario] r WITH (NOLOCK)
                 WHERE r.Estatus = 'Aceptado por Cobranza'";
+                
             if (!string.IsNullOrEmpty(programa) && programa != "Vista general")
                 consultaTotales += " AND r.Programa = @Programa";
+                
+            if (!string.IsNullOrEmpty(municipio) && municipio != "-- Todos los Municipios --")
+                consultaTotales += " AND r.MunicipioContrato = @Municipio";
+                
             SqlCommand cmd = new SqlCommand(consultaTotales, con);
             cmd.CommandTimeout = 180;
+            
             if (!string.IsNullOrEmpty(programa) && programa != "Vista general")
                 cmd.Parameters.AddWithValue("@Programa", programa);
+                
+            if (!string.IsNullOrEmpty(municipio) && municipio != "-- Todos los Municipios --")
+                cmd.Parameters.AddWithValue("@Municipio", municipio);
+                
             con.Open();
             SqlDataReader reader = cmd.ExecuteReader();
             if (reader.Read())
@@ -98,13 +109,29 @@ public partial class VerDatos : System.Web.UI.Page
                     COUNT(DISTINCT r.fiBeneficiario) AS [Total Beneficiarios]
                 FROM 
                     [SIAC].[dbo].[SIVvwResumenBeneficiario] r WITH (NOLOCK)
-                WHERE r.Estatus = 'Aceptado por Cobranza'
+                WHERE r.Estatus = 'Aceptado por Cobranza'";
+                
+            // Agregar filtro de municipio si se ha seleccionado uno
+            if (ddlMunicipios != null && !string.IsNullOrEmpty(ddlMunicipios.SelectedValue) && ddlMunicipios.SelectedValue != "-- Todos los Municipios --")
+            {
+                consulta += " AND r.MunicipioContrato = @Municipio";
+            }
+                
+            consulta += @"
                 GROUP BY 
                     r.Programa
                 ORDER BY 
                     r.Programa";
+                    
             SqlCommand cmd = new SqlCommand(consulta, con);
             cmd.CommandTimeout = 180;
+            
+            // Agregar parámetro de municipio si aplica
+            if (ddlMunicipios != null && !string.IsNullOrEmpty(ddlMunicipios.SelectedValue) && ddlMunicipios.SelectedValue != "-- Todos los Municipios --")
+            {
+                cmd.Parameters.AddWithValue("@Municipio", ddlMunicipios.SelectedValue);
+            }
+            
             SqlDataAdapter da = new SqlDataAdapter(cmd);
             DataTable dt = new DataTable();
             con.Open();
@@ -125,17 +152,32 @@ public partial class VerDatos : System.Web.UI.Page
             // Asigna los datos al GridView
             GridView2.DataSource = dt;
             GridView2.DataBind();
-            MostrarTotalesGenerales();
+            
+            // Obtener municipio seleccionado para los totales
+            string municipioSeleccionado = ddlMunicipios != null && !string.IsNullOrEmpty(ddlMunicipios.SelectedValue) ? ddlMunicipios.SelectedValue : null;
+            MostrarTotalesGenerales(null, municipioSeleccionado);
         }
     }
 
-    // Actualiza el título del resumen según el programa seleccionado
-    private void ActualizarTituloResumen(string programa = null)
+    // Actualiza el título del resumen según el programa y municipio seleccionado
+    private void ActualizarTituloResumen(string programa = null, string municipio = null)
     {
+        string titulo = "Resumen General de Programas";
+        
         if (!string.IsNullOrEmpty(programa) && programa != "Vista general")
-            lblTituloResumen.Text = string.Format("Resumen del Programa: {0}", programa);
-        else
-            lblTituloResumen.Text = "Resumen General de Programas";
+        {
+            titulo = string.Format("Resumen del Programa: {0}", programa);
+        }
+        
+        if (!string.IsNullOrEmpty(municipio) && municipio != "-- Todos los Municipios --")
+        {
+            if (!string.IsNullOrEmpty(programa) && programa != "Vista general")
+                titulo += string.Format(" - Municipio: {0}", municipio);
+            else
+                titulo = string.Format("Resumen General - Municipio: {0}", municipio);
+        }
+        
+        lblTituloResumen.Text = titulo;
     }
 
     // Exporta el GridView a PDF con formato y logos
@@ -267,9 +309,11 @@ public partial class VerDatos : System.Web.UI.Page
     protected void btnGenerarReporte_Click(object sender, EventArgs e)
     {
         string seleccion = ddlProgramas.SelectedValue;
+        string municipioSeleccionado = ddlMunicipios != null && !string.IsNullOrEmpty(ddlMunicipios.SelectedValue) ? ddlMunicipios.SelectedValue : null;
+        
         if (seleccion != "Vista general")
         {
-            MostrarTotalesGenerales(seleccion);
+            MostrarTotalesGenerales(seleccion, municipioSeleccionado);
             // Consulta y muestra solo el programa seleccionado
             string conexion = "Server=localhost\\SQLEXPRESS;Database=SIAC;User ID=wasac;Password=WASAC;";
             using (SqlConnection con = new SqlConnection(conexion))
@@ -290,14 +334,30 @@ public partial class VerDatos : System.Web.UI.Page
                     FROM 
                         [SIAC].[dbo].[SIVvwResumenBeneficiario] r WITH (NOLOCK)
                     WHERE
-                        r.Programa = @Programa AND r.Estatus = 'Aceptado por Cobranza'
+                        r.Programa = @Programa AND r.Estatus = 'Aceptado por Cobranza'";
+                        
+                // Agregar filtro de municipio si se ha seleccionado uno
+                if (!string.IsNullOrEmpty(municipioSeleccionado) && municipioSeleccionado != "-- Todos los Municipios --")
+                {
+                    consulta += " AND r.MunicipioContrato = @Municipio";
+                }
+                        
+                consulta += @"
                     GROUP BY 
                         r.Programa
                     ORDER BY 
                         r.Programa";
+                        
                 SqlCommand cmd = new SqlCommand(consulta, con);
                 cmd.CommandTimeout = 180;
                 cmd.Parameters.AddWithValue("@Programa", seleccion);
+                
+                // Agregar parámetro de municipio si aplica
+                if (!string.IsNullOrEmpty(municipioSeleccionado) && municipioSeleccionado != "-- Todos los Municipios --")
+                {
+                    cmd.Parameters.AddWithValue("@Municipio", municipioSeleccionado);
+                }
+                
                 SqlDataAdapter da = new SqlDataAdapter(cmd);
                 DataTable dt = new DataTable();
                 da.Fill(dt);
@@ -367,5 +427,73 @@ public partial class VerDatos : System.Web.UI.Page
     protected void btnBeneficiariosNoAceptados_Click(object sender, EventArgs e)
     {
         Response.Redirect("BeneficiariosNoAceptados.aspx");
+    }
+    
+    // Botón para ir a la página de Notificaciones
+    protected void btnNotificaciones_Click(object sender, EventArgs e)
+    {
+        Response.Redirect("Notificaciones.aspx");
+    }
+    
+    // Carga la lista de municipios disponibles en todos los programas
+    private void CargarMunicipios()
+    {
+        string conexion = "Server=localhost\\SQLEXPRESS;Database=SIAC;User ID=wasac;Password=WASAC;";
+        using (SqlConnection con = new SqlConnection(conexion))
+        {
+            string consulta = @"SELECT DISTINCT MunicipioContrato 
+                               FROM [SIAC].[dbo].[SIVvwResumenBeneficiario] 
+                               WHERE Estatus = 'Aceptado por Cobranza' 
+                               AND MunicipioContrato IS NOT NULL AND MunicipioContrato <> ''
+                               ORDER BY MunicipioContrato";
+
+            SqlCommand cmd = new SqlCommand(consulta, con);
+            cmd.CommandTimeout = 180;
+            
+            con.Open();
+            SqlDataReader reader = cmd.ExecuteReader();
+
+            ddlMunicipios.Items.Clear();
+            ddlMunicipios.Items.Add(new System.Web.UI.WebControls.ListItem("-- Todos los Municipios --", ""));
+
+            while (reader.Read())
+            {
+                string municipio = reader["MunicipioContrato"].ToString().Trim();
+                if (!string.IsNullOrEmpty(municipio))
+                {
+                    ddlMunicipios.Items.Add(new System.Web.UI.WebControls.ListItem(municipio, municipio));
+                }
+            }
+
+            reader.Close();
+        }
+    }
+    
+    // Evento para el cambio de selección del municipio
+    protected void ddlMunicipios_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        // Mostrar indicador de carga
+        ScriptManager.RegisterStartupScript(this, GetType(), "showLoading", "document.getElementById('loadingMessage').style.display = 'block';", true);
+        
+        // Recargar datos con el filtro de municipio
+        // Si hay un programa seleccionado diferente a "Vista general", mantener esa selección
+        string programaSeleccionado = ddlProgramas.SelectedValue;
+        if (!string.IsNullOrEmpty(programaSeleccionado) && programaSeleccionado != "Vista general")
+        {
+            btnGenerarReporte_Click(sender, e);
+        }
+        else
+        {
+            MostrarDatos();
+        }
+        
+        // Ocultar indicador de carga
+        ScriptManager.RegisterStartupScript(this, GetType(), "hideLoading", "document.getElementById('loadingMessage').style.display = 'none';", true);
+    }
+
+    // Evento del botón de Cobranza Diaria
+    protected void btnCobranza_Click(object sender, EventArgs e)
+    {
+        Response.Redirect("CobranzaDiaria.aspx");
     }
 }
